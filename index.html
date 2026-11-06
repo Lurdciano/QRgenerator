@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de Códigos QR Personalizado</title>
+  <meta name="description" content="Genera códigos QR personalizados con logo, colores y nivel de corrección de errores. 100% en tu navegador, sin backend." />
+
+  <!-- Favicon embebido (sin peticiones extra) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 8h6v6H8zm10 0h6v6h-6zM8 18h6v6H8zm12 2h2v2h-2zm-2-2h2v2h-2zm2 4h2v2h-2zm-2 2h2v2h-2z' fill='white'/%3E%3C/svg%3E" />
+
+  <!-- Tipografía -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Pequeña configuración del tema para mantener el estilo coherente
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
+          },
+          boxShadow: {
+            qr: '0 12px 32px -14px rgba(15, 23, 42, 0.35)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* ---------------------------------------------------------------
+       Ajustes personalizados (fuera de utilidades de Tailwind)
+       --------------------------------------------------------------- */
+
+    /* Slider (nivel EC y tamaño del logo) */
+    .slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      outline: none;
+      cursor: pointer;
+      transition: box-shadow .15s ease;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 9999px;
+      background: #4f46e5;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, .35);
+      transition: transform .15s ease;
+    }
+    .slider::-webkit-slider-thumb:hover { transform: scale(1.12); }
+    .slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      background: #4f46e5;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, .35);
+      cursor: pointer;
+    }
+    .slider:focus-visible { box-shadow: 0 0 0 3px rgba(99, 102, 241, .25); }
+
+    /* Selector de color nativo */
+    .color-input {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 3rem;
+      height: 2.5rem;
+      padding: 0;
+      border: 1px solid #e2e8f0;
+      border-radius: .75rem;
+      background: transparent;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-input::-webkit-color-swatch { border: none; border-radius: .6rem; }
+    .color-input::-moz-color-swatch { border: none; border-radius: .6rem; }
+
+    /* El canvas siempre se comporta como bloque y mantiene su relación cuadrada */
+    #qrCanvas { display: block; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/60 font-sans text-slate-800 antialiased">
+
+  <!-- ============================ CABECERA ============================ -->
+  <div class="relative overflow-hidden">
+    <div class="pointer-events-none absolute -top-24 left-1/2 h-64 w-[42rem] -translate-x-1/2 rounded-full bg-indigo-200/30 blur-3xl"></div>
+
+    <header class="relative mx-auto max-w-6xl px-4 pb-6 pt-10 text-center sm:px-6 sm:pt-14">
+      <span class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-indigo-100 backdrop-blur">
+        <span class="relative flex h-2 w-2">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+        </span>
+        100% en tu navegador · sin subir datos
+      </span>
+
+      <h1 class="mt-5 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+        Generador de
+        <span class="bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text text-transparent">Códigos QR</span>
+        personalizado
+      </h1>
+      <p class="mx-auto mt-3 max-w-xl text-sm text-slate-500 sm:text-base">
+        Personaliza colores, añade tu logo y descarga en PNG o SVG. Todo se genera al instante en tu dispositivo.
+      </p>
+    </header>
+  </div>
+
+  <!-- ============================ CONTENIDO ============================ -->
+  <main class="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+    <noscript>
+      <p class="mb-6 rounded-xl bg-amber-50 p-4 text-center text-sm font-medium text-amber-700 ring-1 ring-amber-200">
+        Activa JavaScript para poder generar y descargar códigos QR.
+      </p>
+    </noscript>
+
+    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+
+      <!-- ---------------------- PANEL DE CONFIGURACIÓN ---------------------- -->
+      <section class="rounded-2xl bg-white/80 p-5 shadow-sm ring-1 ring-slate-200/80 backdrop-blur sm:p-6">
+        <div class="mb-5 flex items-center gap-2">
+          <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </span>
+          <h2 class="text-sm font-semibold text-slate-800">Configuración</h2>
+        </div>
+
+        <div class="space-y-5">
+
+          <!-- Texto / URL -->
+          <div>
+            <label for="qrText" class="mb-1.5 flex items-center justify-between text-sm font-medium text-slate-700">
+              <span>Texto o URL</span>
+              <span id="charCount" class="text-xs font-normal text-slate-400">0 caracteres</span>
+            </label>
+            <textarea
+              id="qrText"
+              rows="3"
+              spellcheck="false"
+              placeholder="https://tu-sitio.com"
+              class="w-full resize-none rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+          </div>
+
+          <!-- Colores -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-slate-700">Colores</span>
+
+              <!-- Temas rápidos -->
+              <div class="flex items-center gap-1.5" aria-label="Temas de color rápidos">
+                <button type="button" data-preset="classic" title="Clásico" aria-label="Tema clásico"
+                  class="h-5 w-5 rounded-full ring-1 ring-slate-200 transition hover:scale-110"
+                  style="background: linear-gradient(135deg, #111827 50%, #ffffff 50%);"></button>
+                <button type="button" data-preset="indigo" title="Índigo" aria-label="Tema índigo"
+                  class="h-5 w-5 rounded-full ring-1 ring-slate-200 transition hover:scale-110"
+                  style="background: linear-gradient(135deg, #4338ca 50%, #eef2ff 50%);"></button>
+                <button type="button" data-preset="forest" title="Bosque" aria-label="Tema bosque"
+                  class="h-5 w-5 rounded-full ring-1 ring-slate-200 transition hover:scale-110"
+                  style="background: linear-gradient(135deg, #065f46 50%, #ecfdf5 50%);"></button>
+                <button type="button" data-preset="sunset" title="Atardecer" aria-label="Tema atardecer"
+                  class="h-5 w-5 rounded-full ring-1 ring-slate-200 transition hover:scale-110"
+                  style="background: linear-gradient(135deg, #9a3412 50%, #fff7ed 50%);"></button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label for="fgColor" class="mb-1 block text-xs font-medium text-slate-500">Módulos</label>
+                <div class="flex items-center gap-2.5">
+                  <input type="color" id="fgColor" value="#111827" class="color-input" aria-label="Color de los módulos" />
+                  <span id="fgHex" class="font-mono text-xs uppercase text-slate-500">#111827</span>
+                </div>
+              </div>
+              <div>
+                <label for="bgColor" class="mb-1 block text-xs font-medium text-slate-500">Fondo</label>
+                <div class="flex items-center gap-2.5">
+                  <input type="color" id="bgColor" value="#ffffff" class="color-input" aria-label="Color de fondo" />
+                  <span id="bgHex" class="font-mono text-xs uppercase text-slate-500">#FFFFFF</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nivel de corrección de errores -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <label for="ecRange" class="text-sm font-medium text-slate-700">Corrección de errores</label>
+              <span id="ecBadge" class="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-600">M · Media</span>
+            </div>
+
+            <input type="range" id="ecRange" min="0" max="3" step="1" value="1" class="slider" aria-label="Nivel de corrección de errores" />
+
+            <div class="mt-2 flex justify-between px-0.5 text-[11px] font-semibold text-slate-400">
+              <span data-ec-tick="0">L</span>
+              <span data-ec-tick="1">M</span>
+              <span data-ec-tick="2">Q</span>
+              <span data-ec-tick="3">H</span>
+            </div>
+
+            <p id="ecDesc" class="mt-1.5 text-xs leading-relaxed text-slate-400">
+              15% de recuperación. Un buen equilibrio para la mayoría de usos.
+            </p>
+          </div>
+
+          <!-- Logo -->
+          <div>
+            <div class="mb-1.5 flex items-center justify-between">
+              <span class="text-sm font-medium text-slate-700">
+                Logo o icono <span class="font-normal text-slate-400">(opcional)</span>
+              </span>
+              <button id="removeLogo" type="button"
+                class="hidden text-xs font-semibold text-rose-500 transition hover:text-rose-600">
+                Quitar
+              </button>
+            </div>
+
+            <div id="dropZone" role="button" tabindex="0" aria-label="Subir imagen de logo"
+              class="group flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-3.5 py-3 transition hover:border-indigo-300 hover:bg-indigo-50/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
+              <input id="logoInput" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" class="sr-only" />
+
+              <!-- Miniatura del logo -->
+              <div id="logoPreviewWrap" style="display: none;"
+                class="h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
+                <img id="logoPreview" alt="Vista previa del logo" class="h-full w-full object-contain p-1" />
+              </div>
+
+              <!-- Icono por defecto -->
+              <div id="logoIcon" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 ring-1 ring-slate-200 transition group-hover:text-indigo-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.6" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 15-5-5L5 21" />
+                </svg>
+              </div>
+
+              <div class="min-w-0">
+                <p id="logoFileName" class="truncate text-sm font-medium text-slate-700">Sube una imagen</p>
+                <p class="text-xs text-slate-400">PNG, JPG, SVG o WebP</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tamaño del logo (solo si hay logo) -->
+          <div id="logoSizeBlock" class="hidden">
+            <div class="mb-2 flex items-center justify-between">
+              <label for="logoSize" class="text-sm font-medium text-slate-700">Tamaño del logo</label>
+              <span id="logoSizeLabel" class="text-xs font-medium text-slate-400">20%</span>
+            </div>
+            <input type="range" id="logoSize" min="8" max="40" step="1" value="20" class="slider" aria-label="Tamaño del logo" />
+          </div>
+
+        </div>
+      </section>
+
+      <!-- --------------------------- VISTA PREVIA --------------------------- -->
+      <section class="rounded-2xl bg-white/80 p-5 shadow-sm ring-1 ring-slate-200/80 backdrop-blur sm:p-6 lg:sticky lg:top-6">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.04 12.32a1 1 0 0 1 0-.64 10.5 10.5 0 0 1 19.92 0 1 1 0 0 1 0 .64 10.5 10.5 0 0 1-19.92 0Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+            </span>
+            Vista previa
+          </h2>
+
+          <!-- Indicador de estado -->
+          <span id="statusPill" role="status" aria-live="polite"
+            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition-colors">
+            <span id="statusDot" class="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+            <span id="statusText">Sin contenido</span>
+          </span>
+        </div>
+
+        <!-- Lienzo del QR -->
+        <div class="mt-4 flex items-center justify-center rounded-xl bg-slate-50 p-5 ring-1 ring-slate-100">
+          <div class="w-full max-w-[320px]">
+            <canvas id="qrCanvas" role="img" aria-label="Código QR generado" class="h-auto w-full rounded-md shadow-qr ring-1 ring-slate-100/80"></canvas>
+
+            <!-- Estado vacío -->
+            <div id="emptyState" style="display: flex;"
+              class="aspect-square w-full flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-slate-200 bg-white/70 text-center">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                  <path stroke-linecap="round" d="M14 14h3v3h-3zM20 14v.01M14 20v.01M20 20v.01M17 20v.01M20 17v.01" />
+                </svg>
+              </div>
+              <p class="px-6 text-sm text-slate-400">Escribe algo para ver tu código QR</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Descargas -->
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <button id="downloadPng" type="button" disabled
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:scale-[.98] disabled:pointer-events-none disabled:opacity-40">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            </svg>
+            PNG
+          </button>
+
+          <button id="downloadSvg" type="button" disabled
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-[.98] disabled:pointer-events-none disabled:opacity-40">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            </svg>
+            SVG
+          </button>
+        </div>
+
+        <p id="statusDetail" class="mt-3 min-h-[2.5rem] text-center text-xs leading-relaxed text-slate-400">
+          Introduce un texto o URL para comenzar.
+        </p>
+
+        <!-- Consejo -->
+        <div class="mt-4 flex gap-2.5 rounded-xl bg-indigo-50/70 p-3 text-xs leading-relaxed text-indigo-700/90">
+          <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.5.4.8 1 .8 1.7V16h5.6v-.5c0-.7.3-1.3.8-1.7A6 6 0 0 0 12 3Z" />
+          </svg>
+          <p>
+            Consejo: para incrustar un logo usa el nivel <strong class="font-semibold">H</strong> y mantén el logo
+            por debajo del tamaño recomendado.
+          </p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-200/70 py-6 text-center text-xs text-slate-400">
+    Hecho con HTML, Tailwind CSS y JavaScript · Tus datos nunca salen del navegador.
+  </footer>
+
+  <!-- Librería de generación de QR (qrcode-generator) + soporte UTF-8 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode_UTF8.js"></script>
+
+  <!-- ============================ LÓGICA DE LA APP ============================ -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* ------------------------------------------------------------------
+         CONSTANTES
+         ------------------------------------------------------------------ */
+      const QUIET_ZONE = 4;   // margen (zona de silencio) en módulos
+      const MODULE_PX = 16;   // píxeles por módulo en el canvas (alta resolución)
+
+      // Niveles de corrección de errores.
+      // safeLogo = tamaño máximo recomendado del logo, en % del ancho del QR.
+      const EC_LEVELS = [
+        { key: 'L', name: 'Baja',   recovery: '7%',  safeLogo: 10, desc: 'Ideal para QR limpios y sin logo.' },
+        { key: 'M', name: 'Media',  recovery: '15%', safeLogo: 18, desc: 'Un buen equilibrio para la mayoría de usos.' },
+        { key: 'Q', name: 'Cuarta', recovery: '25%', safeLogo: 25, desc: 'Recomendado si añades un logo.' },
+        { key: 'H', name: 'Alta',   recovery: '30%', safeLogo: 30, desc: 'Máxima tolerancia, perfecto para logos.' }
+      ];
+
+      const PRESETS = {
+        classic: { fg: '#111827', bg: '#ffffff' },
+        indigo:  { fg: '#4338ca', bg: '#eef2ff' },
+        forest:  { fg: '#065f46', bg: '#ecfdf5' },
+        sunset:  { fg: '#9a3412', bg: '#fff7ed' }
+      };
+
+      const STATUS_STYLES = {
+        success: { pill: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500', detail: 'text-slate-400' },
+        warning: { pill: 'bg-amber-50 text-amber-700 ring-amber-200',       dot: 'bg-amber-500',   detail: 'text-amber-600' },
+        error:   { pill: 'bg-rose-50 text-rose-700 ring-rose-200',          dot: 'bg-rose-500',    detail: 'text-rose-500' },
+        neutral: { pill: 'bg-slate-100 text-slate-600 ring-slate-200',      dot: 'bg-slate-400',   detail: 'text-slate-400' }
+      };
+
+      /* ------------------------------------------------------------------
+         ESTADO DE LA APLICACIÓN
+         ------------------------------------------------------------------ */
+      const state = {
+        text: 'https://example.com',
+        fg: '#111827',
+        bg: '#ffffff',
+        ecIndex: 1,        // 0 = L, 1 = M, 2 = Q, 3 = H
+        logo: null,        // HTMLImageElement
+        logoDataURL: null, // data URL para exportar a SVG
+        logoSize: 20       // % del ancho del área de módulos
+      };
+
+      let currentQR = null;   // último QR generado (objeto de la librería)
+      let renderTimer = null; // debounce del texto
+
+      /* ------------------------------------------------------------------
+         REFERENCIAS AL DOM
+         ------------------------------------------------------------------ */
+      const $ = (id) => document.getElementById(id);
+
+      const qrText = $('qrText');
+      const charCount = $('charCount');
+      const fgColor = $('fgColor');
+      const bgColor = $('bgColor');
+      const fgHex = $('fgHex');
+      const bgHex = $('bgHex');
+      const ecRange = $('ecRange');
+      const ecBadge = $('ecBadge');
+      const ecDesc = $('ecDesc');
+      const ecTicks = Array.from(document.querySelectorAll('[data-ec-tick]'));
+      const logoInput = $('logoInput');
+      const dropZone = $('dropZone');
+      const logoPreview = $('logoPreview');
+      const logoPreviewWrap = $('logoPreviewWrap');
+      const logoIcon = $('logoIcon');
+      const logoFileName = $('logoFileName');
+      const removeLogoBtn = $('removeLogo');
+      const logoSizeBlock = $('logoSizeBlock');
+      const logoSize = $('logoSize');
+      const logoSizeLabel = $('logoSizeLabel');
+      const qrCanvas = $('qrCanvas');
+      const emptyState = $('emptyState');
+      const statusPill = $('statusPill');
+      const statusDot = $('statusDot');
+      const statusText = $('statusText');
+      const statusDetail = $('statusDetail');
+      const downloadPng = $('downloadPng');
+      const downloadSvg = $('downloadSvg');
+
+      const ctx = qrCanvas.getContext('2d');
+
+      /* ------------------------------------------------------------------
+         UTILIDADES
+         ------------------------------------------------------------------ */
+      const fmt = (n) => Number(n.toFixed(3));
+
+      // Rellena visualmente la parte activa del slider
+      function setSliderFill(el) {
+        const min = Number(el.min);
+        const max = Number(el.max);
+        const val = Number(el.value);
+        const pct = ((val - min) / (max - min)) * 100;
+        el.style.background =
+          `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${pct}%, #e2e8f0 ${pct}%, #e2e8f0 100%)`;
+      }
+
+      // Luminancia relativa (WCAG) de un color hexadecimal
+      function relativeLuminance(hex) {
+        const clean = hex.replace('#', '');
+        const channels = [0, 2, 4].map((i) => parseInt(clean.slice(i, i + 2), 16) / 255);
+        const linear = channels.map((v) =>
+          v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+        );
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+      }
+
+      // Relación de contraste entre dos colores (de 1:1 a 21:1)
+      function contrastRatio(hexA, hexB) {
+        const a = relativeLuminance(hexA);
+        const b = relativeLuminance(hexB);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      }
+
+      // Rectángulo redondeado compatible con navegadores antiguos
+      function roundRect(context, x, y, w, h, r) {
+        const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+        context.beginPath();
+        if (typeof context.roundRect === 'function') {
+          context.roundRect(x, y, w, h, radius);
+          return;
+        }
+        context.moveTo(x + radius, y);
+        context.arcTo(x + w, y, x + w, y + h, radius);
+        context.arcTo(x + w, y + h, x, y + h, radius);
+        context.arcTo(x, y + h, x, y, radius);
+        context.arcTo(x, y, x + w, y, radius);
+        context.closePath();
+      }
+
+      /* ------------------------------------------------------------------
+         INDICADOR DE ESTADO
+         ------------------------------------------------------------------ */
+      function setStatus(type, text, detail) {
+        const s = STATUS_STYLES[type] || STATUS_STYLES.neutral;
+        statusPill.className =
+          `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition-colors ${s.pill}`;
+        statusDot.className = `h-1.5 w-1.5 rounded-full ${s.dot}`;
+        statusText.textContent = text;
+        statusDetail.className = `mt-3 min-h-[2.5rem] text-center text-xs leading-relaxed ${s.detail}`;
+        statusDetail.textContent = detail;
+      }
+
+      /* ------------------------------------------------------------------
+         GEOMETRÍA DEL LOGO
+         Devuelve coordenadas en "unidades de módulo" (se escalan al dibujar).
+         ------------------------------------------------------------------ */
+      function logoGeometry(qr) {
+        if (!state.logo) return null;
+
+        const size = qr.getModuleCount();
+        const total = size + QUIET_ZONE * 2;
+
+        // Caja máxima del logo, relativa al ancho del área de módulos
+        const box = size * (state.logoSize / 100);
+
+        // Mantener proporciones originales de la imagen
+        const ratio = (state.logo.naturalWidth / state.logo.naturalHeight) || 1;
+        let w = box;
+        let h = box;
+        if (ratio >= 1) {
+          h = box / ratio; // imagen apaisada
+        } else {
+          w = box * ratio; // imagen vertical
+        }
+
+        // Centrado exacto
+        const x = (total - w) / 2;
+        const y = (total - h) / 2;
+
+        // "Placa" de fondo para dar aire y contraste al logo
+        const pad = box * 0.10;
+
+        return {
+          total,
+          x, y, w, h,
+          plateX: x - pad,
+          plateY: y - pad,
+          plateW: w + pad * 2,
+          plateH: h + pad * 2,
+          plateR: pad * 1.4
+        };
+      }
+
+      /* ------------------------------------------------------------------
+         DIBUJO EN CANVAS
+         ------------------------------------------------------------------ */
+      function drawQR(qr) {
+        const size = qr.getModuleCount();
+        const total = size + QUIET_ZONE * 2;
+        const dim = total * MODULE_PX;
+
+        // El tamaño real del canvas define la resolución de exportación
+        qrCanvas.width = dim;
+        qrCanvas.height = dim;
+
+        // Fondo
+        ctx.fillStyle = state.bg;
+        ctx.fillRect(0, 0, dim, dim);
+
+        // Módulos del QR
+        ctx.fillStyle = state.fg;
+        for (let row = 0; row < size; row++) {
+          const y = (row + QUIET_ZONE) * MODULE_PX;
+          for (let col = 0; col < size; col++) {
+            if (qr.isDark(row, col)) {
+              ctx.fillRect((col + QUIET_ZONE) * MODULE_PX, y, MODULE_PX, MODULE_PX);
+            }
+          }
+        }
+
+        // Logo (si existe)
+        const g = logoGeometry(qr);
+        if (!g) return;
+
+        // Placa de fondo redondeada
+        ctx.fillStyle = state.bg;
+        roundRect(
+          ctx,
+          g.plateX * MODULE_PX,
+          g.plateY * MODULE_PX,
+          g.plateW * MODULE_PX,
+          g.plateH * MODULE_PX,
+          g.plateR * MODULE_PX
+        );
+        ctx.fill();
+
+        // Imagen del logo
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(
+          state.logo,
+          g.x * MODULE_PX,
+          g.y * MODULE_PX,
+          g.w * MODULE_PX,
+          g.h * MODULE_PX
+        );
+        ctx.restore();
+      }
+
+      /* ------------------------------------------------------------------
+         CONSTRUCCIÓN DEL SVG (para exportación vectorial)
+         ------------------------------------------------------------------ */
+      function buildSVG(qr) {
+        const size = qr.getModuleCount();
+        const total = size + QUIET_ZONE * 2;
+        const px = MODULE_PX;
+        const runs = [];
+
+        // Agrupamos módulos contiguos en horizontal para reducir el tamaño del SVG
+        for (let row = 0; row < size; row++) {
+          let col = 0;
+          while (col < size) {
+            if (qr.isDark(row, col)) {
+              const start = col;
+              while (col < size && qr.isDark(row, col)) col++;
+              runs.push(
+                `<rect x="${start + QUIET_ZONE}" y="${row + QUIET_ZONE}" width="${col - start}" height="1"/>`
+              );
+            } else {
+              col++;
+            }
+          }
+        }
+
+        // Logo embebido como data URL
+        let logoMarkup = '';
+        const g = logoGeometry(qr);
+        if (g && state.logoDataURL) {
+          logoMarkup =
+            `\n  <rect x="${fmt(g.plateX)}" y="${fmt(g.plateY)}" width="${fmt(g.plateW)}" height="${fmt(g.plateH)}" rx="${fmt(g.plateR)}" fill="${state.bg}"/>` +
+            `\n  <image x="${fmt(g.x)}" y="${fmt(g.y)}" width="${fmt(g.w)}" height="${fmt(g.h)}" href="${state.logoDataURL}" preserveAspectRatio="xMidYMid meet"/>`;
+        }
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${total * px}" height="${total * px}" viewBox="0 0 ${total} ${total}">
+  <rect width="${total}" height="${total}" fill="${state.bg}"/>
+  <g fill="${state.fg}" shape-rendering="crispEdges">${runs.join('')}</g>${logoMarkup}
+</svg>`;
+      }
+
+      /* ------------------------------------------------------------------
+         LÓGICA DE ESTADO / RENDERIZADO
+         ------------------------------------------------------------------ */
+      function setDownloadsEnabled(enabled) {
+        downloadPng.disabled = !enabled;
+        downloadSvg.disabled = !enabled;
+      }
+
+      function updateStatus() {
+        const level = EC_LEVELS[state.ecIndex];
+
+        // 1) El contraste es lo más importante para poder leer el QR
+        const ratio = contrastRatio(state.fg, state.bg);
+        if (ratio < 3) {
+          setStatus(
+            'warning',
+            'Poco contraste',
+            `El contraste entre módulos y fondo es ${ratio.toFixed(1)}:1. Usa colores más contrastados para que el QR se pueda leer.`
+          );
+          return;
+        }
+
+        // 2) Comprobar que el logo no tapa demasiados módulos
+        if (state.logo) {
+          if (state.logoSize > level.safeLogo) {
+            setStatus(
+              'warning',
+              'Revisa el logo',
+              `El logo ocupa el ${state.logoSize}% del ancho y el nivel ${level.key} tolera hasta ~${level.safeLogo}%. ` +
+              `Redúcelo o sube la corrección de errores.`
+            );
+          } else {
+            setStatus(
+              'success',
+              'Escaneable',
+              `Logo dentro del área segura del nivel ${level.key} (máx. ~${level.safeLogo}%).`
+            );
+          }
+        } else {
+          setStatus(
+            'success',
+            'Escaneable',
+            `Sin logo · nivel ${level.key} (${level.recovery} de recuperación).`
+          );
+        }
+      }
+
+      function showEmpty() {
+        qrCanvas.style.display = 'none';
+        emptyState.style.display = 'flex';
+      }
+
+      function showCanvas() {
+        emptyState.style.display = 'none';
+        qrCanvas.style.display = 'block';
+      }
+
+      function render() {
+        // La librería pudo no cargar (sin conexión, CDN bloqueado, etc.)
+        if (typeof qrcode === 'undefined') {
+          currentQR = null;
+          showEmpty();
+          setDownloadsEnabled(false);
+          setStatus(
+            'error',
+            'Librería no disponible',
+            'No se pudo cargar la librería de QR. Revisa tu conexión a internet y recarga la página.'
+          );
+          return;
+        }
+
+        const text = state.text.trim();
+
+        if (!text) {
+          currentQR = null;
+          showEmpty();
+          setDownloadsEnabled(false);
+          setStatus('neutral', 'Sin contenido', 'Introduce un texto o URL para generar tu código QR.');
+          return;
+        }
+
+        let qr;
+        try {
+          // typeNumber 0 = detección automática de la versión
+          qr = qrcode(0, EC_LEVELS[state.ecIndex].key);
+          qr.addData(text);
+          qr.make();
+        } catch (err) {
+          currentQR = null;
+          showEmpty();
+          setDownloadsEnabled(false);
+          setStatus(
+            'error',
+            'No se pudo generar',
+            'El contenido es demasiado largo para este nivel de corrección. Acorta el texto o baja el nivel.'
+          );
+          return;
+        }
+
+        currentQR = qr;
+        showCanvas();
+        drawQR(qr);
+        updateStatus();
+        setDownloadsEnabled(true);
+      }
+
+      // Debounce para no repintar en cada tecla
+      function scheduleRender() {
+        clearTimeout(renderTimer);
+        renderTimer = setTimeout(render, 120);
+      }
+
+      /* ------------------------------------------------------------------
+         ACTUALIZACIÓN DE LA INTERFAZ DE EC Y LOGO
+         ------------------------------------------------------------------ */
+      function updateECUI() {
+        const level = EC_LEVELS[state.ecIndex];
+
+        ecBadge.textContent = `${level.key} · ${level.name}`;
+        ecDesc.textContent = `${level.recovery} de recuperación. ${level.desc}`;
+
+        ecTicks.forEach((tick, i) => {
+          const active = i === state.ecIndex;
+          tick.classList.toggle('text-indigo-600', active);
+          tick.classList.toggle('text-slate-400', !active);
+        });
+
+        setSliderFill(ecRange);
+
+        // El máximo recomendado del logo depende del nivel elegido
+        if (state.logo) updateLogoSizeHint();
+      }
+
+      function updateLogoSizeHint() {
+        const level = EC_LEVELS[state.ecIndex];
+        const isOver = state.logoSize > level.safeLogo;
+
+        logoSizeLabel.textContent = `${state.logoSize}% · máx. ~${level.safeLogo}%`;
+        logoSizeLabel.classList.toggle('text-amber-600', isOver);
+        logoSizeLabel.classList.toggle('text-slate-400', !isOver);
+
+        setSliderFill(logoSize);
+      }
+
+      /* ------------------------------------------------------------------
+         CARGA Y ELIMINACIÓN DEL LOGO
+         ------------------------------------------------------------------ */
+      function loadLogoFile(file) {
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+          setStatus('warning', 'Archivo no válido', 'Selecciona una imagen (PNG, JPG, SVG o WebP).');
+          return;
+        }
+
+        if (file.size > 4 * 1024 * 1024) {
+          setStatus('warning', 'Imagen muy grande', 'Usa una imagen de menos de 4 MB para un mejor rendimiento.');
+          return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+          const img = new Image();
+
+          img.onload = () => {
+            state.logo = img;
+            state.logoDataURL = event.target.result;
+
+            logoPreview.src = event.target.result;
+            logoPreviewWrap.style.display = 'flex';
+            logoIcon.style.display = 'none';
+            logoFileName.textContent = file.name;
+            removeLogoBtn.classList.remove('hidden');
+            logoSizeBlock.classList.remove('hidden');
+
+            updateLogoSizeHint();
+            render();
+          };
+
+          img.onerror = () => {
+            setStatus('error', 'No se pudo leer la imagen', 'Prueba con otro archivo (PNG, JPG o SVG).');
+          };
+
+          img.src = event.target.result;
+        };
+
+        reader.onerror = () => {
+          setStatus('error', 'Error de lectura', 'No se pudo leer el archivo seleccionado.');
+        };
+
+        reader.readAsDataURL(file);
+        logoInput.value = ''; // permite volver a elegir el mismo archivo
+      }
+
+      function removeLogo() {
+        state.logo = null;
+        state.logoDataURL = null;
+
+        logoInput.value = '';
+        logoPreview.removeAttribute('src');
+        logoPreviewWrap.style.display = 'none';
+        logoIcon.style.display = 'flex';
+        logoFileName.textContent = 'Sube una imagen';
+        removeLogoBtn.classList.add('hidden');
+        logoSizeBlock.classList.add('hidden');
+
+        render();
+      }
+
+      /* ------------------------------------------------------------------
+         DESCARGAS
+         ------------------------------------------------------------------ */
+      function fileName(ext) {
+        const base = (state.text.trim() || 'codigo-qr')
+          .replace(/^https?:\/\//i, '')
+          .replace(/[^a-z0-9]+/gi, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40)
+          .toLowerCase();
+
+        return `${base || 'codigo-qr'}.${ext}`;
+      }
+
+      function downloadPNG() {
+        if (!currentQR) return;
+
+        const link = document.createElement('a');
+        link.href = qrCanvas.toDataURL('image/png');
+        link.download = fileName('png');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+
+      function downloadSVG() {
+        if (!currentQR) return;
+
+        const svg = buildSVG(currentQR);
+        const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName('svg');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      }
+
+      /* ------------------------------------------------------------------
+         EVENTOS
+         ------------------------------------------------------------------ */
+      qrText.addEventListener('input', () => {
+        state.text = qrText.value;
+
+        const len = qrText.value.length;
+        charCount.textContent = `${len} caracter${len === 1 ? '' : 'es'}`;
+
+        scheduleRender();
+      });
+
+      fgColor.addEventListener('input', () => {
+        state.fg = fgColor.value;
+        fgHex.textContent = fgColor.value.toUpperCase();
+        render();
+      });
+
+      bgColor.addEventListener('input', () => {
+        state.bg = bgColor.value;
+        bgHex.textContent = bgColor.value.toUpperCase();
+        render();
+      });
+
+      ecRange.addEventListener('input', () => {
+        state.ecIndex = Number(ecRange.value);
+        updateECUI();
+        render();
+      });
+
+      logoSize.addEventListener('input', () => {
+        state.logoSize = Number(logoSize.value);
+        updateLogoSizeHint();
+        render();
+      });
+
+      // Temas de color rápidos
+      document.querySelectorAll('[data-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const preset = PRESETS[btn.dataset.preset];
+          if (!preset) return;
+
+          state.fg = preset.fg;
+          state.bg = preset.bg;
+          fgColor.value = preset.fg;
+          bgColor.value = preset.bg;
+          fgHex.textContent = preset.fg.toUpperCase();
+          bgHex.textContent = preset.bg.toUpperCase();
+
+          render();
+        });
+      });
+
+      // Zona de subida: clic y teclado
+      dropZone.addEventListener('click', (event) => {
+        // Evita reabrir el diálogo cuando el clic proviene del propio input
+        if (event.target === logoInput) return;
+        logoInput.click();
+      });
+
+      dropZone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          logoInput.click();
+        }
+      });
+
+      logoInput.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (file) loadLogoFile(file);
+      });
+
+      removeLogoBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        removeLogo();
+      });
+
+      // Arrastrar y soltar
+      ['dragenter', 'dragover'].forEach((evt) => {
+        dropZone.addEventListener(evt, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropZone.classList.add('border-indigo-400', 'bg-indigo-50/60');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach((evt) => {
+        dropZone.addEventListener(evt, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/60');
+        });
+      });
+
+      dropZone.addEventListener('drop', (event) => {
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) loadLogoFile(file);
+      });
+
+      downloadPng.addEventListener('click', downloadPNG);
+      downloadSvg.addEventListener('click', downloadSVG);
+
+      /* ------------------------------------------------------------------
+         INICIALIZACIÓN
+         ------------------------------------------------------------------ */
+      function init() {
+        // Refuerzo de UTF-8: el núcleo ya trae esta función, aunque el
+        // parche opcional qrcode_UTF8.js no llegue a cargar.
+        if (typeof qrcode !== 'undefined' && qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs['UTF-8']) {
+          qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+        }
+
+        qrText.value = state.text;
+        charCount.textContent = `${state.text.length} caracteres`;
+
+        fgHex.textContent = state.fg.toUpperCase();
+        bgHex.textContent = state.bg.toUpperCase();
+
+        updateECUI();
+        setSliderFill(logoSize);
+        logoSizeLabel.textContent = `${state.logoSize}%`;
+
+        render();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
